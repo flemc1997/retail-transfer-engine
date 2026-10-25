@@ -63,6 +63,7 @@ CREATE TABLE IF NOT EXISTS batches (
     col        VARCHAR   NOT NULL,
     size       VARCHAR   NOT NULL,
     qty        INTEGER   NOT NULL CHECK (qty > 0),
+    reason     VARCHAR,           -- why the run was suggested, in business words
     created_at TIMESTAMP NOT NULL DEFAULT current_timestamp,
     PRIMARY KEY (run_id, size)
 )
@@ -82,6 +83,12 @@ CREATE TABLE IF NOT EXISTS decisions (
 """
 
 TABLE_DDLS = [HISTORY_DDL, NORMS_DDL, BATCHES_DDL, DECISIONS_DDL]
+
+# Columns added after a table was first created. CREATE TABLE IF NOT EXISTS leaves an
+# existing table alone, so these bring older database files up to date.
+MIGRATIONS = [
+    "ALTER TABLE batches ADD COLUMN IF NOT EXISTS reason VARCHAR",  # module 5
+]
 
 # The seed files store numbers as text like "1.0"; read as DOUBLE, then cast to whole
 # numbers where the column holds units.
@@ -122,8 +129,8 @@ def connect(db_path: Path, read_only: bool = False) -> duckdb.DuckDBPyConnection
 
 
 def create_schema(con: duckdb.DuckDBPyConnection) -> None:
-    """Create any missing tables. Safe to run every time: existing tables are left alone."""
-    for ddl in TABLE_DDLS:
+    """Create any missing tables and columns. Safe to run every time: existing data is left alone."""
+    for ddl in TABLE_DDLS + MIGRATIONS:
         con.execute(ddl)
 
 

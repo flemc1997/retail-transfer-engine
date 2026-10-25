@@ -12,7 +12,12 @@ from transfer_engine.lines import build_lines
 from transfer_engine.rules import run_id, run_sizes, suggest_moves, suggest_tidy_ups
 from transfer_engine.settings import Settings
 
-BATCH_COLUMNS = ["run_id", "yr", "wk", "kind", "sender", "receiver", "sty", "col", "size", "qty"]
+BATCH_COLUMNS = ["run_id", "yr", "wk", "kind", "sender", "receiver", "sty", "col", "size", "qty", "reason"]
+
+
+def weeks_with_batches(con: duckdb.DuckDBPyConnection) -> list[tuple[int, int]]:
+    """Weeks that already have saved suggestions, newest first."""
+    return con.execute("SELECT DISTINCT yr, wk FROM batches ORDER BY yr DESC, wk DESC").fetchall()
 
 
 def latest_week(con: duckdb.DuckDBPyConnection) -> tuple[int, int]:
