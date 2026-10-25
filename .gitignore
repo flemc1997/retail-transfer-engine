@@ -18,3 +18,7 @@ __pycache__/
 # Editors / OS
 .DS_Store
 .vscode/
+
+# Links Streamlit creates into the local conda env (machine-specific)
+.agents/
+.claude/skills/developing-with-streamlit

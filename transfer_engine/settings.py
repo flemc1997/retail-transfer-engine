@@ -51,7 +51,8 @@ class MoveRules:
     receiver_min_rate: float  # a receiver must sell at least this many units a week...
     receiver_max_cover_weeks: float  # ...and have less than this many weeks of cover
     donor_min_units: int  # a donor must hold at least this many units...
-    donor_min_cover_weeks: float  # ...and at least this many weeks of cover
+    donor_min_cover_weeks: float  # ...and at least this many weeks of cover...
+    donor_min_weeks_since_first_stocked: int  # ...and the line must have had this long to sell
     receiver_max_cover_after_weeks: float  # don't overstock: receiver cover after the move
 
     def __post_init__(self) -> None:
@@ -67,7 +68,7 @@ class TidyUpRules:
     max_units_per_store: int  # ...where no store holds more than this
     min_weeks_since_first_stocked: int  # give new lines time to sell first
     min_chain_cover_weeks: float  # slow = at least this many weeks of chain cover
-    accessories_dept: str  # department name treated as accessories
+    accessory_categories: list[str]  # categories treated as accessories
     accessories_max_chain_units: int  # accessories only tidied when the chain total is this small
 
     def __post_init__(self) -> None:

@@ -60,9 +60,12 @@ Always whole style-colour runs (every size the sender holds). Skip any style-col
 
 All thresholds live in `config/config.example.json`.
 
-Known issues to fix (good first changes for Cillian): the week helper assumes 52 weeks a year (2026 has an ISO week 53); moves have no "new-in" rule for donors.
+Known issues from the legacy engine, both fixed: the week helper assumed 52 weeks a year (now ISO weeks, `weeks.py`, module 3); moves had no "new-in" rule for donors (now `donor_min_weeks_since_first_stocked`, module 4; measured chain-wide, a per-store version is a possible follow-up).
 
-Candidate rule (Cillian, decide in module 4): don't suggest a transfer when that item is already on the way (`rem` > 0). Details to agree: whether it blocks the run outright or counts towards the receiver's cover.
+Agreed in module 4:
+- Stock on the way (`rem`) counts towards a receiver's cover: receiver cover = (stock + on the way) ÷ rate. Donors only send booked-in stock.
+- Accessories = a list of categories (`accessory_categories`), tidied only when the chain holds ≤ 12 units (legacy value).
+- Ties are broken alphabetically by store code so results are repeatable (the legacy engine used config order or an unstable sort; on week 42 of 2026 that changed 3 of 25 moves, all exact ties).
 
 ## Build order
 

@@ -9,7 +9,8 @@
     "receiver_max_cover_weeks": 4,
     "donor_min_units": 3,
     "donor_min_cover_weeks": 12,
-    "receiver_max_cover_after_weeks": 12
+    "receiver_max_cover_after_weeks": 12,
+    "donor_min_weeks_since_first_stocked": 4
   },
   "tidy_ups": {
     "rate_weeks": 8,
@@ -17,13 +18,41 @@
     "max_units_per_store": 5,
     "min_weeks_since_first_stocked": 6,
     "min_chain_cover_weeks": 12,
-    "accessories_dept": "Accessories",
-    "accessories_max_chain_units": 10
+    "accessory_categories": [
+      "Bags",
+      "Belts",
+      "Headwear",
+      "Other Accessories",
+      "Scarves",
+      "Socks"
+    ],
+    "accessories_max_chain_units": 12
   },
   "export": {
-    "store_match": {"Northgate": "NG", "Riverside": "RS", "Eastfield": "EF", "Westway": "WW"},
-    "exclude_stores": ["Outlet"],
-    "brand_prefixes": {"MNA": ["Men", "Brand M"], "WMA": ["Women", "Brand W"]},
-    "split_colours": [["WMA EXAMPLE DRESS", "Black"]]
+    "store_match": {
+      "Northgate": "NG",
+      "Riverside": "RS",
+      "Eastfield": "EF",
+      "Westway": "WW"
+    },
+    "exclude_stores": [
+      "Outlet"
+    ],
+    "brand_prefixes": {
+      "MNA": [
+        "Men",
+        "Brand M"
+      ],
+      "WMA": [
+        "Women",
+        "Brand W"
+      ]
+    },
+    "split_colours": [
+      [
+        "WMA EXAMPLE DRESS",
+        "Black"
+      ]
+    ]
   }
 }
