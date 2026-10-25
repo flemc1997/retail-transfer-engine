@@ -67,6 +67,8 @@ Agreed in module 4:
 - Accessories = a list of categories (`accessory_categories`), tidied only when the chain holds ≤ 12 units (legacy value).
 - Ties are broken alphabetically by store code so results are repeatable (the legacy engine used config order or an unstable sort; on week 42 of 2026 that changed 3 of 25 moves, all exact ties).
 
+Known limitation (found in module 7): the receiver rate counts sales, and sales stop at zero stock, so a store that sold out more than `rate_weeks` ago has rate 0 and can't receive, even if it's the store that most needs the line (censored demand). A possible follow-up: measure the rate only over weeks the store had stock.
+
 ## Build order
 
 1. Project setup: `pyproject.toml` or `requirements.txt` (streamlit, pandas, duckdb, openpyxl, pytest), `.gitignore`, `.env.example`, settings loader.
