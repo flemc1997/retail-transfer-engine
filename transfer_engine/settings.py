@@ -27,6 +27,14 @@ class SettingsError(Exception):
     """Raised when the environment or config file is missing or malformed."""
 
 
+def _require_positive_rate_weeks(rate_weeks: int, section: str) -> None:
+    """The sales rate divides by the number of weeks, so it must be at least 1."""
+    if rate_weeks <= 0:
+        raise SettingsError(
+            f"Config section '{section}': rate_weeks must be greater than 0, got {rate_weeks}"
+        )
+
+
 @dataclass(frozen=True)
 class UploadRules:
     """Safety checks applied to each weekly export before it is appended."""
@@ -47,6 +55,9 @@ class MoveRules:
     donor_min_cover_weeks: float  # ...and at least this many weeks of cover
     receiver_max_cover_after_weeks: float  # don't overstock: receiver cover after the move
 
+    def __post_init__(self) -> None:
+        _require_positive_rate_weeks(self.rate_weeks, "moves")
+
 
 @dataclass(frozen=True)
 class TidyUpRules:
@@ -59,6 +70,9 @@ class TidyUpRules:
     min_chain_cover_weeks: float  # slow = at least this many weeks of chain cover
     accessories_dept: str  # department name treated as accessories
     accessories_max_chain_units: int  # accessories only tidied when the chain total is this small
+
+    def __post_init__(self) -> None:
+        _require_positive_rate_weeks(self.rate_weeks, "tidy_ups")
 
 
 @dataclass(frozen=True)
@@ -106,7 +120,6 @@ def _build_section(cls: type, raw: dict[str, Any], name: str) -> Any:
             f"unknown {sorted(unknown) or 'none'}"
         )
     return cls(**raw)
-
 
 def load_config(path: Path) -> tuple[UploadRules, MoveRules, TidyUpRules]:
     """Read the thresholds file and return one typed object per rule group."""

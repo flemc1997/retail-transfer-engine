@@ -51,3 +51,18 @@ def test_typo_in_config_is_rejected(
 
     with pytest.raises(SettingsError, match="donor_min_unit"):
         load_settings(env_file=None)
+
+
+@pytest.mark.parametrize("section", ["moves", "tidy_ups"])
+@pytest.mark.parametrize("bad_value", [0, -1])
+def test_rate_weeks_must_be_positive(
+    section: str, bad_value: int, data_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    raw = json.loads(DEFAULT_CONFIG_PATH.read_text())
+    raw[section]["rate_weeks"] = bad_value
+    bad = tmp_path / "bad.json"
+    bad.write_text(json.dumps(raw))
+    monkeypatch.setenv("RETAIL_CONFIG", str(bad))
+
+    with pytest.raises(SettingsError, match=f"'{section}': rate_weeks"):
+        load_settings(env_file=None)
