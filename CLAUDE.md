@@ -24,7 +24,9 @@ Ask one question at a time when something needs deciding. Cillian is on a Mac, u
 
 In: upload weekly export → checks → append to history; transfer suggestions (moves + tidy-ups); approve / partial / reject; picking list download (Excel); one trading page (sales vs last year and last week by store and category, slow movers, follow-up check on whether last week's approved transfers happened).
 
-Out (live-system features, not needed here): Sunday freeze, mid-week pushes, stores page, norm review, Black Friday, sales chart, region-split tidy-ups, size top-ups, colour variants.
+Out (live-system features, not needed here): Sunday freeze, mid-week pushes, stores page, norm review, Black Friday, sales chart, region-split tidy-ups, size top-ups.
+
+Colour variants: in scope only as the legacy split rule (agreed in module 3). For the style-colours on a split list, the colour becomes `colour · variant` (from the export's `Style Variant Name`), so uploads match the seeded history. The split list names real products, so it lives only in the local config outside the repo.
 
 ## Data
 
@@ -39,7 +41,7 @@ Seeding: `$RETAIL_DATA_DIR/seed/history.csv.gz` and `seed/norms.csv` load the in
 
 ### Weekly upload (safety net, agreed)
 
-1. Parse the Power BI export (format: see `load_export` in the legacy engine).
+1. Parse the Power BI export (format: see `load_export` in the legacy engine). Blank stock (`Stock EOH QTY`) is stored as 0, matching recent history (agreed in module 3). Real store names, the excluded store and the variant split list come from the local config at `$RETAIL_DATA_DIR/config.json` (set `RETAIL_CONFIG` to it); `config/config.example.json` holds made-up values in the same shape. Category = Power BI's `Style Master Category Name` for every style; each upload also gives that style the same category in its earlier weeks (history was relabelled once with `scripts/relabel_categories.py`).
 2. Check: exactly one week, all four stores, expected columns present; total sales ≥ ~60% of the previous week and of the same week last year. Show a preview (week, stores, sales, vs LY) with a Confirm button.
 3. Copy `retail.duckdb` to `$RETAIL_DATA_DIR/backups/` (keep the last 4).
 4. In one transaction: delete rows for that year/week/store, insert the new rows, refresh norms.

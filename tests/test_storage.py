@@ -4,14 +4,17 @@ import gzip
 from pathlib import Path
 
 import duckdb
+import pandas as pd
 import pytest
 
 from transfer_engine.storage import (
     backup_database,
+    category_translation,
     connect,
     create_schema,
     prune_backups,
     seed_from_csv,
+    translate_old_categories,
 )
 
 HISTORY_HEADER = "yr,wk,store,dept,brand,cat,num,sty,col,size,q,v,md,st,gp,rem"
@@ -127,3 +130,27 @@ def test_prune_ignores_other_files(tmp_path: Path) -> None:
 
     assert [p.name for p in deleted] == ["retail-20260101.duckdb"]
     assert (tmp_path / "notes.txt").exists()
+
+
+def test_category_translation_learns_from_shared_styles(con: duckdb.DuckDBPyConnection) -> None:
+    rows = [  # (style, dept, old category)
+        ("TEE 1", "Men", "Tees & Polos"), ("TEE 2", "Men", "Tees & Polos"), ("TEE 3", "Men", "Tees & Polos"),
+        ("OLD TEE", "Men", "Tees & Polos"),
+    ]
+    for sty, dept, cat in rows:
+        con.execute(
+            "INSERT INTO history VALUES (2026, 1, 'A', ?, 'B', ?, 1, ?, 'Red', 'M', 1, 1.0, 0, 1, 0, NULL)",
+            [dept, cat, sty],
+        )
+    export_styles = pd.DataFrame(
+        {"sty": ["TEE 1", "TEE 2", "TEE 3"], "cat": ["T-Shirts & Tops", "T-Shirts & Tops", "Knit"]}
+    )
+
+    translation = category_translation(con, export_styles)
+    changed = translate_old_categories(con, translation, export_styles["sty"].tolist())
+
+    assert translation.to_dict("records") == [
+        {"dept": "Men", "old_cat": "Tees & Polos", "new_cat": "T-Shirts & Tops", "styles": 2, "runner_up_styles": 1}
+    ]
+    assert changed == 1  # only OLD TEE: styles in the export are relabelled from the export instead
+    assert con.execute("SELECT cat FROM history WHERE sty = 'OLD TEE'").fetchone() == ("T-Shirts & Tops",)

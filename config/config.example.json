@@ -1,6 +1,5 @@
 {
   "upload": {
-    "expected_store_count": 4,
     "min_sales_ratio": 0.6,
     "backups_to_keep": 4
   },
@@ -20,5 +19,11 @@
     "min_chain_cover_weeks": 12,
     "accessories_dept": "Accessories",
     "accessories_max_chain_units": 10
+  },
+  "export": {
+    "store_match": {"Northgate": "NG", "Riverside": "RS", "Eastfield": "EF", "Westway": "WW"},
+    "exclude_stores": ["Outlet"],
+    "brand_prefixes": {"MNA": ["Men", "Brand M"], "WMA": ["Women", "Brand W"]},
+    "split_colours": [["WMA EXAMPLE DRESS", "Black"]]
   }
 }

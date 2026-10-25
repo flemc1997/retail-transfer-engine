@@ -12,12 +12,13 @@ from datetime import datetime
 from pathlib import Path
 
 import duckdb
+import pandas as pd
 
 # One row per year, week, store, style, colour and size.
 HISTORY_DDL = """
 CREATE TABLE IF NOT EXISTS history (
-    yr    SMALLINT NOT NULL,
-    wk    SMALLINT NOT NULL CHECK (wk BETWEEN 1 AND 53),  -- ISO weeks: some years have 53
+    yr    INTEGER  NOT NULL,
+    wk    INTEGER  NOT NULL CHECK (wk BETWEEN 1 AND 53),  -- ISO weeks: some years have 53
     store VARCHAR  NOT NULL,
     dept  VARCHAR  NOT NULL,
     brand VARCHAR  NOT NULL,
@@ -53,8 +54,8 @@ CREATE TABLE IF NOT EXISTS norms (
 BATCHES_DDL = """
 CREATE TABLE IF NOT EXISTS batches (
     run_id     VARCHAR   NOT NULL,
-    yr         SMALLINT  NOT NULL,
-    wk         SMALLINT  NOT NULL,
+    yr         INTEGER   NOT NULL,
+    wk         INTEGER   NOT NULL,
     kind       VARCHAR   NOT NULL CHECK (kind IN ('move', 'tidy')),
     sender     VARCHAR   NOT NULL,
     receiver   VARCHAR   NOT NULL CHECK (receiver <> sender),
@@ -85,7 +86,7 @@ TABLE_DDLS = [HISTORY_DDL, NORMS_DDL, BATCHES_DDL, DECISIONS_DDL]
 # The seed files store numbers as text like "1.0"; read as DOUBLE, then cast to whole
 # numbers where the column holds units.
 HISTORY_CSV_TYPES = {
-    "yr": "SMALLINT", "wk": "SMALLINT", "store": "VARCHAR", "dept": "VARCHAR",
+    "yr": "INTEGER", "wk": "INTEGER", "store": "VARCHAR", "dept": "VARCHAR",
     "brand": "VARCHAR", "cat": "VARCHAR", "num": "DOUBLE", "sty": "VARCHAR",
     "col": "VARCHAR", "size": "VARCHAR", "q": "DOUBLE", "v": "DOUBLE", "md": "DOUBLE",
     "st": "DOUBLE", "gp": "DOUBLE", "rem": "DOUBLE",
@@ -98,11 +99,23 @@ NORMS_CSV_TYPES = {
 HISTORY_WHOLE_NUMBER_COLUMNS = ["num", "q", "st", "rem"]
 NORMS_WHOLE_NUMBER_COLUMNS = ["norm"]
 
+HISTORY_COLUMNS = [
+    "yr", "wk", "store", "dept", "brand", "cat", "num", "sty", "col", "size",
+    "q", "v", "md", "st", "gp", "rem",
+]
+NORMS_COLUMNS = ["store", "sty", "col", "size", "norm"]
+
 BACKUP_PREFIX = "retail-"
 
 
-def connect(db_path: Path) -> duckdb.DuckDBPyConnection:
-    """Open the master file (creating it if needed) and make sure every table exists."""
+def connect(db_path: Path, read_only: bool = False) -> duckdb.DuckDBPyConnection:
+    """Open the master file and make sure every table exists.
+
+    `read_only=True` is for screens that only look (previews, checks): it can't change
+    anything, and it skips creating tables, so the file must already exist.
+    """
+    if read_only:
+        return duckdb.connect(str(db_path), read_only=True)
     con = duckdb.connect(str(db_path))
     create_schema(con)
     return con
@@ -178,6 +191,139 @@ def seed_from_csv(con: duckdb.DuckDBPyConnection, seed_dir: Path) -> dict[str, i
         raise
 
     return {t: con.execute(f"SELECT count(*) FROM {t}").fetchone()[0] for t in ("history", "norms")}
+
+
+def set_style_categories(con: duckdb.DuckDBPyConnection, styles: pd.DataFrame) -> int:
+    """Give each style in `styles` (columns sty, cat) that category in every week of history.
+
+    A category belongs to the style, not the week, so when the export says a style is
+    'Knit', all its earlier rows become 'Knit' too. Doesn't start a transaction itself:
+    the caller decides. Returns the number of history rows changed.
+    """
+    con.register("style_categories", styles[["sty", "cat"]])
+    try:
+        changed = con.execute(
+            """
+            UPDATE history SET cat = s.cat
+            FROM style_categories s
+            WHERE history.sty = s.sty AND history.cat <> s.cat
+            """
+        ).fetchone()[0]
+    finally:
+        con.unregister("style_categories")
+    return changed
+
+
+def category_translation(con: duckdb.DuckDBPyConnection, styles: pd.DataFrame) -> pd.DataFrame:
+    """Learn which master category each old (legacy) category usually became.
+
+    For styles in both history and the export (`styles`: sty, cat), count how often each
+    (dept, old category) pairs with each master category, and keep the most common one.
+    Ties go to the alphabetically first master category, so the result is repeatable.
+    Returns columns dept, old_cat, new_cat, styles (how many styles back the choice),
+    and runner_up_styles (styles behind the second choice; equal means a tie).
+    """
+    con.register("export_styles", styles[["sty", "cat"]])
+    try:
+        return con.execute(
+            """
+            WITH pairs AS (
+                SELECT h.dept, h.cat AS old_cat, e.cat AS new_cat, count(DISTINCT h.sty) AS styles
+                FROM (SELECT DISTINCT sty, dept, cat FROM history) h
+                JOIN export_styles e USING (sty)
+                GROUP BY ALL
+            ), ranked AS (
+                SELECT *,
+                       row_number() OVER (PARTITION BY dept, old_cat ORDER BY styles DESC, new_cat) AS rank,
+                       lead(styles) OVER (PARTITION BY dept, old_cat ORDER BY styles DESC, new_cat) AS runner_up_styles
+                FROM pairs
+            )
+            SELECT dept, old_cat, new_cat, styles, coalesce(runner_up_styles, 0) AS runner_up_styles
+            FROM ranked WHERE rank = 1
+            ORDER BY dept, old_cat
+            """
+        ).df()
+    finally:
+        con.unregister("export_styles")
+
+
+def translate_old_categories(
+    con: duckdb.DuckDBPyConnection, translation: pd.DataFrame, skip_styles: list[str]
+) -> int:
+    """Rename old categories using `translation`, for styles not in `skip_styles`.
+
+    Used once, for styles no longer sold, which no export will ever relabel. Doesn't
+    start a transaction itself. Returns the number of history rows changed.
+    """
+    con.register("translation", translation[["dept", "old_cat", "new_cat"]])
+    try:
+        return con.execute(
+            """
+            UPDATE history SET cat = t.new_cat
+            FROM translation t
+            WHERE history.dept = t.dept AND history.cat = t.old_cat
+              AND history.cat <> t.new_cat
+              AND NOT list_contains(?, history.sty)
+            """,
+            [skip_styles],
+        ).fetchone()[0]
+    finally:
+        con.unregister("translation")
+
+
+def replace_week(
+    con: duckdb.DuckDBPyConnection, history_rows: pd.DataFrame, norms_rows: pd.DataFrame
+) -> dict[str, int | bool]:
+    """Put one week of export rows into the master, all in one transaction.
+
+    1. Delete that week's rows for the stores in the export (so re-uploading a week replaces it).
+    2. Insert the new rows.
+    3. Give each style in the export its category in every week (see `set_style_categories`).
+    4. If this is the newest week in history, replace the norms snapshot with the export's.
+       An older week being re-uploaded must not overwrite newer norms.
+
+    If any step fails, everything is rolled back and the master is exactly as before.
+    """
+    weeks = history_rows[["yr", "wk"]].drop_duplicates()
+    if len(weeks) != 1:
+        raise ValueError(f"Expected rows for exactly one week, got {len(weeks)}")
+    yr, wk = (int(x) for x in weeks.iloc[0])
+    stores = sorted(history_rows["store"].unique())
+
+    con.execute("BEGIN")
+    try:
+        deleted = con.execute(
+            "DELETE FROM history WHERE yr = ? AND wk = ? AND list_contains(?, store)",
+            [yr, wk, stores],
+        ).fetchone()[0]
+
+        con.register("new_history", history_rows[HISTORY_COLUMNS])
+        con.execute(f"INSERT INTO history SELECT {', '.join(HISTORY_COLUMNS)} FROM new_history")
+        con.unregister("new_history")
+
+        categories_changed = set_style_categories(
+            con, history_rows[["sty", "cat"]].drop_duplicates("sty")
+        )
+
+        newest = con.execute("SELECT max(yr * 100 + wk) FROM history").fetchone()[0]
+        norms_refreshed = yr * 100 + wk == newest
+        if norms_refreshed:
+            con.execute("DELETE FROM norms")
+            con.register("new_norms", norms_rows[NORMS_COLUMNS])
+            con.execute(f"INSERT INTO norms SELECT {', '.join(NORMS_COLUMNS)} FROM new_norms")
+            con.unregister("new_norms")
+
+        con.execute("COMMIT")
+    except Exception:
+        con.execute("ROLLBACK")
+        raise
+
+    return {
+        "rows_deleted": deleted,
+        "rows_inserted": len(history_rows),
+        "categories_changed": categories_changed,
+        "norms_refreshed": norms_refreshed,
+    }
 
 
 def backup_database(db_path: Path, backup_dir: Path, keep: int) -> Path:

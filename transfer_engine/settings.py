@@ -39,7 +39,6 @@ def _require_positive_rate_weeks(rate_weeks: int, section: str) -> None:
 class UploadRules:
     """Safety checks applied to each weekly export before it is appended."""
 
-    expected_store_count: int  # the export must contain exactly this many stores
     min_sales_ratio: float  # total sales must be at least this share of last week and of LY
     backups_to_keep: int  # how many database copies to keep in backups/
 
@@ -76,6 +75,30 @@ class TidyUpRules:
 
 
 @dataclass(frozen=True)
+class ExportMapping:
+    """How to read the Power BI export: which stores and brands to keep, which colours to split.
+
+    These are real store and product names, so the real values live only in the local
+    config outside the repo; `config.example.json` has made-up ones.
+    """
+
+    store_match: dict[str, str]  # text found in 'Store Name' -> store code
+    exclude_stores: list[str]  # text in 'Store Name' for stores to ignore
+    brand_prefixes: dict[str, list[str]]  # style-name prefix -> [dept, brand]; other brands are dropped
+    split_colours: list[list[str]]  # [style, colour] pairs whose colour is split by variant
+
+    def __post_init__(self) -> None:
+        for prefix, dept_brand in self.brand_prefixes.items():
+            if len(dept_brand) != 2:
+                raise SettingsError(f"Config section 'export': brand_prefixes['{prefix}'] must be [dept, brand]")
+
+    @property
+    def store_codes(self) -> list[str]:
+        """Every store the export must contain."""
+        return sorted(set(self.store_match.values()))
+
+
+@dataclass(frozen=True)
 class Settings:
     """Everything the app needs to know about its environment."""
 
@@ -84,6 +107,7 @@ class Settings:
     upload: UploadRules
     moves: MoveRules
     tidy_ups: TidyUpRules
+    export: ExportMapping
 
     @property
     def db_path(self) -> Path:
@@ -121,8 +145,8 @@ def _build_section(cls: type, raw: dict[str, Any], name: str) -> Any:
         )
     return cls(**raw)
 
-def load_config(path: Path) -> tuple[UploadRules, MoveRules, TidyUpRules]:
-    """Read the thresholds file and return one typed object per rule group."""
+def load_config(path: Path) -> tuple[UploadRules, MoveRules, TidyUpRules, ExportMapping]:
+    """Read the config file and return one typed object per section."""
     if not path.is_file():
         raise SettingsError(f"Config file not found: {path}")
     try:
@@ -130,7 +154,12 @@ def load_config(path: Path) -> tuple[UploadRules, MoveRules, TidyUpRules]:
     except json.JSONDecodeError as exc:
         raise SettingsError(f"Config file is not valid JSON: {path} ({exc})") from exc
 
-    sections = {"upload": UploadRules, "moves": MoveRules, "tidy_ups": TidyUpRules}
+    sections = {
+        "upload": UploadRules,
+        "moves": MoveRules,
+        "tidy_ups": TidyUpRules,
+        "export": ExportMapping,
+    }
     for name in sections:
         if name not in raw:
             raise SettingsError(f"Config file is missing the '{name}' section: {path}")
@@ -157,5 +186,5 @@ def load_settings(env_file: Path | None = REPO_ROOT / ".env") -> Settings:
     if not config_path.is_absolute():
         config_path = REPO_ROOT / config_path
 
-    upload, moves, tidy_ups = load_config(config_path)
-    return Settings(data_dir, config_path, upload, moves, tidy_ups)
+    upload, moves, tidy_ups, export = load_config(config_path)
+    return Settings(data_dir, config_path, upload, moves, tidy_ups, export)
