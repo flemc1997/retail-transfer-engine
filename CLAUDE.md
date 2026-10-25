@@ -30,7 +30,7 @@ Out (live-system features, not needed here): Sunday freeze, mid-week pushes, sto
 
 One DuckDB file: `$RETAIL_DATA_DIR/retail.duckdb`.
 
-- `history` – one row per year, week, store, style, colour, size: `yr, wk, store, dept, brand, cat, num, sty, col, size, q (units), v (sales value incl. VAT), md (markdown %), st (closing stock), gp (gross profit)`.
+- `history` – one row per year, week, store, style, colour, size: `yr, wk, store, dept, brand, cat, num, sty, col, size, q (units), v (sales value incl. VAT), md (markdown %), st (closing stock), gp (gross profit), rem (remaining qty: invoiced / in transit, not yet booked in)`. The master keeps every export column, because the export is deleted after upload and this is the only copy.
 - `norms` – `store, sty, col, size, norm` (latest snapshot; a norm > 0 means the line is auto-replenished).
 - `batches` – the transfer suggestions generated for each week, with a stable run id.
 - `decisions` – approved / partial (with sizes) / rejected, reason or note, per run id.
@@ -59,6 +59,8 @@ Always whole style-colour runs (every size the sender holds). Skip any style-col
 All thresholds live in `config/config.example.json`.
 
 Known issues to fix (good first changes for Cillian): the week helper assumes 52 weeks a year (2026 has an ISO week 53); moves have no "new-in" rule for donors.
+
+Candidate rule (Cillian, decide in module 4): don't suggest a transfer when that item is already on the way (`rem` > 0). Details to agree: whether it blocks the run outright or counts towards the receiver's cover.
 
 ## Build order
 

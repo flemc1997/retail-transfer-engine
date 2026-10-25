@@ -1,6 +1,7 @@
 # Real data and secrets — never commit (see CLAUDE.md, hard rules)
 .env
 *.duckdb
+*.duckdb.wal
 *.csv.gz
 *.xlsx
 data/local/
