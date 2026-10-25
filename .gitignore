@@ -1,0 +1,19 @@
+# Real data and secrets — never commit (see CLAUDE.md, hard rules)
+.env
+*.duckdb
+*.csv.gz
+*.xlsx
+data/local/
+backups/
+config/config.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+.pytest_cache/
+
+# Editors / OS
+.DS_Store
+.vscode/

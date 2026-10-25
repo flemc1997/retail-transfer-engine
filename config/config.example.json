@@ -1,0 +1,24 @@
+{
+  "upload": {
+    "expected_store_count": 4,
+    "min_sales_ratio": 0.6,
+    "backups_to_keep": 4
+  },
+  "moves": {
+    "rate_weeks": 4,
+    "receiver_min_rate": 0.5,
+    "receiver_max_cover_weeks": 4,
+    "donor_min_units": 3,
+    "donor_min_cover_weeks": 12,
+    "receiver_max_cover_after_weeks": 12
+  },
+  "tidy_ups": {
+    "rate_weeks": 8,
+    "min_stores_holding": 2,
+    "max_units_per_store": 5,
+    "min_weeks_since_first_stocked": 6,
+    "min_chain_cover_weeks": 12,
+    "accessories_dept": "Accessories",
+    "accessories_max_chain_units": 10
+  }
+}
