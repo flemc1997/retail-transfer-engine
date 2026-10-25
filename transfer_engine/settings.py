@@ -76,6 +76,17 @@ class TidyUpRules:
 
 
 @dataclass(frozen=True)
+class TradingRules:
+    """Thresholds for the trading page: slow movers and the transfer follow-up."""
+
+    slow_window_weeks: int  # slow movers: look at sales over this many recent weeks...
+    slow_max_units: int  # ...and list lines that sold this many units or fewer
+    slow_new_in_weeks: int  # lines first stocked more recently than this are 'new in', not slow
+    slow_seasonal_share: float  # seasonal: sold at least this share of today's stock in the coming weeks last year
+    followup_received_share: float  # a transfer counts as received once this share of its units has arrived
+
+
+@dataclass(frozen=True)
 class ExportMapping:
     """How to read the Power BI export: which stores and brands to keep, which colours to split.
 
@@ -109,6 +120,7 @@ class Settings:
     moves: MoveRules
     tidy_ups: TidyUpRules
     export: ExportMapping
+    trading: TradingRules
 
     @property
     def db_path(self) -> Path:
@@ -146,7 +158,7 @@ def _build_section(cls: type, raw: dict[str, Any], name: str) -> Any:
         )
     return cls(**raw)
 
-def load_config(path: Path) -> tuple[UploadRules, MoveRules, TidyUpRules, ExportMapping]:
+def load_config(path: Path) -> tuple[UploadRules, MoveRules, TidyUpRules, ExportMapping, TradingRules]:
     """Read the config file and return one typed object per section."""
     if not path.is_file():
         raise SettingsError(f"Config file not found: {path}")
@@ -160,6 +172,7 @@ def load_config(path: Path) -> tuple[UploadRules, MoveRules, TidyUpRules, Export
         "moves": MoveRules,
         "tidy_ups": TidyUpRules,
         "export": ExportMapping,
+        "trading": TradingRules,
     }
     for name in sections:
         if name not in raw:
@@ -187,5 +200,5 @@ def load_settings(env_file: Path | None = REPO_ROOT / ".env") -> Settings:
     if not config_path.is_absolute():
         config_path = REPO_ROOT / config_path
 
-    upload, moves, tidy_ups, export = load_config(config_path)
-    return Settings(data_dir, config_path, upload, moves, tidy_ups, export)
+    upload, moves, tidy_ups, export, trading = load_config(config_path)
+    return Settings(data_dir, config_path, upload, moves, tidy_ups, export, trading)

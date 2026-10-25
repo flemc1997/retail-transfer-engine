@@ -22,7 +22,7 @@ from transfer_engine.rules import (
 )
 from transfer_engine.settings import DEFAULT_CONFIG_PATH, load_config
 
-_, MOVES, TIDY, _ = load_config(DEFAULT_CONFIG_PATH)
+_, MOVES, TIDY, _, _ = load_config(DEFAULT_CONFIG_PATH)
 
 
 def line(*stores: dict[str, object], sty: str = "STYLE", col: str = "Red", **shared: object) -> pd.DataFrame:

@@ -14,5 +14,6 @@ connect(load_settings().db_path).close()
 pages = [
     st.Page("app_pages/upload.py", title="Weekly upload", icon=":material/upload_file:"),
     st.Page("app_pages/transfers.py", title="Transfers", icon=":material/local_shipping:"),
+    st.Page("app_pages/trading.py", title="Trading", icon=":material/monitoring:"),
 ]
 st.navigation(pages).run()

@@ -54,5 +54,12 @@
         "Black"
       ]
     ]
+  },
+  "trading": {
+    "slow_window_weeks": 13,
+    "slow_max_units": 2,
+    "slow_new_in_weeks": 10,
+    "slow_seasonal_share": 0.5,
+    "followup_received_share": 0.7
   }
 }
